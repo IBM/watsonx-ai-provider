@@ -1,11 +1,25 @@
 {
   "name": "watsonx-ai-provider",
   "author": "IBM",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "license": "MIT",
   "description": "watsonx.ai provider for Vercel AI SDK",
+  "homepage": "https://github.com/ibm/watsonx-ai-provider",
+  "keywords": [
+    "ai",
+    "ai sdk",
+    "ibm",
+    "vercel",
+    "watsonx",
+    "watsonx.ai"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/IBM/watsonx-ai-provider.git",
+    "directory": "package"
+  },
   "scripts": {
     "build": "tsc"
   },
