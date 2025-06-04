@@ -1,0 +1,25 @@
+{
+  "name": "watsonx-ai-provider-nextjs-example",
+  "version": "1.0.0",
+  "scripts": {
+    "start": "next dev"
+  },
+  "dependencies": {
+    "@ai-sdk/react": "^1.2.9",
+    "ai": "^4.3.8",
+    "dotenv": "^16.5.0",
+    "next": "15.3.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "watsonx-ai-provider": "file:../../package"
+  },
+  "devDependencies": {
+    "@eslint/eslintrc": "^3",
+    "@types/node": "^20",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "eslint": "^9",
+    "eslint-config-next": "15.3.0",
+    "typescript": "^5"
+  }
+}

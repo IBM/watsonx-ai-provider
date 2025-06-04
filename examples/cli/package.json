@@ -1,0 +1,18 @@
+{
+  "name": "watsonx-ai-provider-cli-example",
+  "version": "1.0.0",
+  "scripts": {
+    "start": "tsx index.ts"
+  },
+  "dependencies": {
+    "ai": "^4.2.10",
+    "dotenv": "^16.4.7",
+    "watsonx-ai-provider": "file:../../package",
+    "zod": "^3.24.4"
+  },
+  "devDependencies": {
+    "@types/node": "^22.13.17",
+    "tsx": "^4.19.3",
+    "typescript": "^5.8.2"
+  }
+}
