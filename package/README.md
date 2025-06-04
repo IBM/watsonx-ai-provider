@@ -10,7 +10,7 @@ npm i watsonx-ai-provider
 
 ```typescript
 import { generateText } from "ai";
-import { createWatsonxProvider } from "./src";
+import { createWatsonxProvider } from "watsonx-ai-provider";
 
 const watsonx = createWatsonxProvider({ projectId: process.env.WATSONX_AI_PROJECT_ID });
 
