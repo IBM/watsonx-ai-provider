@@ -5,7 +5,7 @@ watsonx-ai-provider provides [watsonx.ai](https://www.ibm.com/products/watsonx-a
 To use this in your code:
 
 ```sh
-npm i --save git+ssh://github.ibm.com:digital/watsonx-ai-provider.git
+npm i watsonx-ai-provider
 ```
 
 ```typescript
