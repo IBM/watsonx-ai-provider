@@ -133,12 +133,19 @@ class WatsonxChatLanguageModel {
                 }
                 if ((_d = (_c = (_b = chunk.data.choices[0]) === null || _b === void 0 ? void 0 : _b.delta) === null || _c === void 0 ? void 0 : _c.tool_calls) === null || _d === void 0 ? void 0 : _d.length) {
                     const toolCall = chunk.data.choices[0].delta.tool_calls[0];
+                    //console.log('Stream tool call chunk:', {
+                    //    id: toolCall.id,
+                    //    functionName: toolCall.function?.name,
+                    //    functionArguments: toolCall.function?.arguments,
+                    //    argumentsLength: toolCall.function?.arguments?.length,
+                    //    fullChunk: JSON.stringify(chunk.data)
+                    //});
                     if (toolCall.id)
                         toolCallAcc.toolCallId = toolCall.id;
                     if (toolCall.function.name)
                         toolCallAcc.toolName = toolCall.function.name;
                     if (toolCall.function.arguments)
-                        toolCallAcc.args = toolCall.function.arguments;
+                        toolCallAcc.args += toolCall.function.arguments;
                 }
                 if (chunk.data.usage) {
                     const finish = {
@@ -150,6 +157,12 @@ class WatsonxChatLanguageModel {
                         },
                     };
                     if (toolCallAcc.toolCallId) {
+                        //console.log('Final tool args:', {
+                        //  toolCallId: toolCallAcc.toolCallId,
+                        //  toolName: toolCallAcc.toolName,
+                        //  args: toolCallAcc.args,
+                        //  argsLength: toolCallAcc.args.length
+                        //});
                         return [{ ...toolCallAcc, type: "tool-call", toolCallType: "function" }, finish];
                     }
                     return [finish];
