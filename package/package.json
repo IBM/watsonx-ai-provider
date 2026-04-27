@@ -1,6 +1,6 @@
 {
   "name": "watsonx-ai-provider",
-  "version": "1.0.4",
+  "version": "2.0.0",
   "description": "IBM watsonx.ai provider for the Vercel AI SDK - access Granite, OpenAI, Llama, Mistral, and other foundation models",
   "license": "Apache-2.0",
   "author": "IBM",
