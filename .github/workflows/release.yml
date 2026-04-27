@@ -14,10 +14,6 @@ permissions:
   pull-requests: write  # open / update the Version Packages PR
   id-token: write       # required for npm Trusted Publishing (OIDC) + provenance
 
-defaults:
-  run:
-    working-directory: package
-
 jobs:
   release:
     runs-on: ubuntu-latest
@@ -33,21 +29,114 @@ jobs:
           cache-dependency-path: package/package-lock.json
 
       - name: Install dependencies
+        working-directory: package
         run: npm ci
 
       - name: Build
+        working-directory: package
         run: npm run build
 
-      # If there are pending changesets, this opens (or updates) a "Version
-      # Packages" PR that bumps the version + writes CHANGELOG. When that PR
-      # is merged, this same step runs again, finds no pending changesets,
-      # and runs `publish` instead — pushing to npm and tagging.
-      - name: Create release PR or publish
-        uses: changesets/action@v1
-        with:
-          cwd: package
-          version: npm run version
-          publish: npm run release
-          createGithubReleases: true
+      # Two-mode flow (replicates changesets/action@v1):
+      #   pending changesets exist → open/update "Version Packages" PR
+      #   no pending changesets    → publish if package.json version is unreleased
+      - name: Detect pending changesets
+        id: pending
+        run: |
+          COUNT=$(find package/.changeset -maxdepth 1 -name '*.md' ! -name 'README.md' | wc -l | tr -d ' ')
+          if [ "$COUNT" -gt 0 ]; then
+            echo "has_changesets=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "has_changesets=false" >> "$GITHUB_OUTPUT"
+          fi
+          echo "Pending changesets: $COUNT"
+
+      # ── Mode A: open / update the Version Packages PR ────────────────────
+      - name: Run changeset version
+        if: steps.pending.outputs.has_changesets == 'true'
+        working-directory: package
+        run: npx changeset version
+
+      - name: Open or update Version Packages PR
+        if: steps.pending.outputs.has_changesets == 'true'
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          BRANCH="changeset-release/main"
+          NEW_VERSION=$(node -p "require('./package/package.json').version")
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git checkout -B "$BRANCH"
+          git add -A
+          if git diff --cached --quiet; then
+            echo "changeset version produced no diff — nothing to do"
+            exit 0
+          fi
+
+          git commit -s -m "chore: version packages ($NEW_VERSION)"
+          git push --force origin "$BRANCH"
+
+          # Open the PR if one doesn't exist for this branch yet. Force-push
+          # above already updates an existing PR's commits in place.
+          PR_NUMBER=$(gh pr list --head "$BRANCH" --base main --state open --json number --jq '.[0].number // empty')
+          if [ -z "$PR_NUMBER" ]; then
+            gh pr create \
+              --base main \
+              --head "$BRANCH" \
+              --title "chore: version packages ($NEW_VERSION)" \
+              --body "Bumps the package version and updates CHANGELOG.md based on pending changesets. Merging this PR triggers an npm publish."
+          else
+            echo "Updated existing PR #$PR_NUMBER"
+          fi
+
+      # ── Mode B: publish if package.json version is ahead of npm ──────────
+      - name: Check for unpublished version
+        if: steps.pending.outputs.has_changesets == 'false'
+        id: publish_check
+        working-directory: package
+        run: |
+          LOCAL=$(node -p "require('./package.json').version")
+          PUBLISHED=$(npm view watsonx-ai-provider version 2>/dev/null || echo "")
+          echo "version=$LOCAL" >> "$GITHUB_OUTPUT"
+          if [ "$LOCAL" != "$PUBLISHED" ]; then
+            echo "needs_publish=true" >> "$GITHUB_OUTPUT"
+            echo "Will publish: local=$LOCAL, npm=$PUBLISHED"
+          else
+            echo "needs_publish=false" >> "$GITHUB_OUTPUT"
+            echo "Already published: $LOCAL"
+          fi
+
+      - name: Publish to npm (Trusted Publishing / OIDC)
+        if: steps.pending.outputs.has_changesets == 'false' && steps.publish_check.outputs.needs_publish == 'true'
+        working-directory: package
+        run: npm publish --provenance --access public
+
+      - name: Tag and create GitHub Release
+        if: steps.pending.outputs.has_changesets == 'false' && steps.publish_check.outputs.needs_publish == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          VERSION="${{ steps.publish_check.outputs.version }}"
+          TAG="v$VERSION"
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag "$TAG"
+          git push origin "$TAG"
+
+          # Use the matching section from CHANGELOG.md as the release body.
+          BODY=""
+          if [ -f package/CHANGELOG.md ]; then
+            BODY=$(awk -v ver="$VERSION" '
+              $0 == "## " ver { in_section=1; next }
+              in_section && /^## / { exit }
+              in_section { print }
+            ' package/CHANGELOG.md)
+          fi
+
+          if [ -n "$BODY" ]; then
+            printf '%s\n' "$BODY" | gh release create "$TAG" --title "$TAG" --notes-file -
+          else
+            gh release create "$TAG" --title "$TAG" --generate-notes
+          fi
