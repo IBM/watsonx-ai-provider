@@ -1,42 +1,57 @@
-// https://dataplatform.cloud.ibm.com/docs/content/wsj/analyze-data/fm-models.html?context=wx
+import { z } from 'zod';
+
 export type WatsonxChatModelId =
-  | "cross-encoder/ms-marco-minilm-l-12-v2"
-  | "google/flan-t5-xl"
-  | "google/flan-t5-xxl"
-  | "google/flan-ul2"
-  | "ibm/granite-13b-instruct-v2"
-  | "ibm/granite-20b-code-instruct"
-  | "ibm/granite-3-2-8b-instruct"
-  | "ibm/granite-3-2b-instruct"
-  | "ibm/granite-3-8b-instruct"
-  | "ibm/granite-34b-code-instruct"
-  | "ibm/granite-3b-code-instruct"
-  | "ibm/granite-8b-code-instruct"
-  | "ibm/granite-embedding-107m-multilingual"
-  | "ibm/granite-embedding-278m-multilingual"
-  | "ibm/granite-guardian-3-2b"
-  | "ibm/granite-guardian-3-8b"
-  | "ibm/granite-ttm-1024-96-r2"
-  | "ibm/granite-ttm-1536-96-r2"
-  | "ibm/granite-ttm-512-96-r2"
-  | "ibm/granite-vision-3-2-2b"
-  | "ibm/slate-125m-english-rtrvr"
-  | "ibm/slate-30m-english-rtrvr"
-  | "ibm/slate-30m-english-rtrvr-v2"
-  | "intfloat/multilingual-e5-large"
-  | "meta-llama/llama-3-2-11b-vision-instruct"
-  | "meta-llama/llama-3-2-1b-instruct"
-  | "meta-llama/llama-3-2-3b-instruct"
-  | "meta-llama/llama-3-2-90b-vision-instruct"
-  | "meta-llama/llama-3-3-70b-instruct"
-  | "meta-llama/llama-3-405b-instruct"
-  | "meta-llama/llama-guard-3-11b-vision"
-  | "mistralai/mistral-large"
-  | "mistralai/mixtral-8x7b-instruct-v01"
-  | "sentence-transformers/all-minilm-l12-v2"
-  | "sentence-transformers/all-minilm-l6-v2"
+  // OpenAI
+  | 'openai/gpt-oss-120b'
+  // IBM Granite models
+  | 'ibm/granite-4-h-small'
+  | 'ibm/granite-8b-code-instruct'
+  // Meta Llama models
+  | 'meta-llama/llama-3-3-70b-instruct'
+  | 'meta-llama/llama-3-2-11b-vision-instruct'
+  | 'meta-llama/llama-3-2-3b-instruct'
+  | 'meta-llama/llama-3-2-1b-instruct'
+  // Mistral models
+  // Note: mistral-medium-2505 has a known wx.ai streaming bug where tool-call
+  // tokens are billed but never transmitted in SSE deltas. Route mistral
+  // tool-calling workloads through doGenerate (non-streaming) or pick a
+  // different family until IBM fixes it.
+  | 'mistralai/mistral-medium-2505'
+  | 'mistralai/mistral-small-3-1-24b-instruct-2503'
+  | 'mistralai/pixtral-12b'
+  // Allow any model ID
   | (string & {});
 
-export interface WatsonxChatSettings {
-  projectId?: string;
-}
+/**
+ * watsonx.ai-specific options passed via `providerOptions.watsonx` on a call.
+ * Standard generation parameters (temperature, topP, topK, maxOutputTokens,
+ * stopSequences) live on LanguageModelV3CallOptions and should be passed there.
+ */
+export const watsonxLanguageModelOptions = z.object({
+  /**
+   * Maximum wall-clock time in milliseconds the server will spend on this
+   * request before aborting. Unique to watsonx.ai.
+   */
+  timeLimit: z.number().optional(),
+
+  /**
+   * Whether the model may call multiple tools in parallel within one response.
+   * Forwarded to wx.ai as `parallel_tool_calls`. Defaults to the model's native
+   * behavior (usually true) when unset.
+   */
+  parallelToolCalls: z.boolean().optional(),
+
+  /**
+   * Reasoning effort for reasoning-capable models. Forwarded to wx.ai as
+   * `reasoning_effort`. Verified to scale chain-of-thought length on
+   * `openai/gpt-oss-120b` (HIGH produces ~3× the reasoning of LOW).
+   *
+   * Models without reasoning capability (e.g. `ibm/granite-4-h-small`)
+   * accept the field but produce no `reasoning_content` regardless.
+   */
+  reasoningEffort: z.enum(['low', 'medium', 'high']).optional(),
+});
+
+export type WatsonxLanguageModelOptions = z.infer<
+  typeof watsonxLanguageModelOptions
+>;

@@ -1,57 +1,39 @@
-"use strict";
-var __defProp = Object.defineProperty;
-var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
-var __getOwnPropNames = Object.getOwnPropertyNames;
-var __hasOwnProp = Object.prototype.hasOwnProperty;
-var __export = (target, all) => {
-  for (var name in all)
-    __defProp(target, name, { get: all[name], enumerable: true });
-};
-var __copyProps = (to, from, except, desc) => {
-  if (from && typeof from === "object" || typeof from === "function") {
-    for (let key of __getOwnPropNames(from))
-      if (!__hasOwnProp.call(to, key) && key !== except)
-        __defProp(to, key, { get: () => from[key], enumerable: !(desc = __getOwnPropDesc(from, key)) || desc.enumerable });
-  }
-  return to;
-};
-var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: true }), mod);
-
-// src/index.ts
-var index_exports = {};
-__export(index_exports, {
-  WATSONX_API_VERSION: () => WATSONX_API_VERSION,
-  WatsonxChatLanguageModel: () => WatsonxChatLanguageModel,
-  WatsonxEmbeddingModel: () => WatsonxEmbeddingModel,
-  createWatsonx: () => createWatsonx,
-  createWatsonxProvider: () => createWatsonx,
-  watsonx: () => watsonx,
-  watsonxLanguageModelOptions: () => watsonxLanguageModelOptions
-});
-module.exports = __toCommonJS(index_exports);
-
 // src/watsonx-provider.ts
-var import_provider5 = require("@ai-sdk/provider");
-var import_provider_utils5 = require("@ai-sdk/provider-utils");
+import {
+  NoSuchModelError
+} from "@ai-sdk/provider";
+import {
+  withUserAgentSuffix,
+  withoutTrailingSlash
+} from "@ai-sdk/provider-utils";
 
 // src/watsonx-chat-language-model.ts
-var import_provider3 = require("@ai-sdk/provider");
-var import_provider_utils3 = require("@ai-sdk/provider-utils");
+import {
+  APICallError
+} from "@ai-sdk/provider";
+import {
+  postJsonToApi,
+  createJsonResponseHandler,
+  createEventSourceResponseHandler,
+  generateId as defaultGenerateId,
+  parseProviderOptions,
+  combineHeaders
+} from "@ai-sdk/provider-utils";
 
 // src/watsonx-chat-settings.ts
-var import_zod = require("zod");
-var watsonxLanguageModelOptions = import_zod.z.object({
+import { z } from "zod";
+var watsonxLanguageModelOptions = z.object({
   /**
    * Maximum wall-clock time in milliseconds the server will spend on this
    * request before aborting. Unique to watsonx.ai.
    */
-  timeLimit: import_zod.z.number().optional(),
+  timeLimit: z.number().optional(),
   /**
    * Whether the model may call multiple tools in parallel within one response.
    * Forwarded to wx.ai as `parallel_tool_calls`. Defaults to the model's native
    * behavior (usually true) when unset.
    */
-  parallelToolCalls: import_zod.z.boolean().optional(),
+  parallelToolCalls: z.boolean().optional(),
   /**
    * Reasoning effort for reasoning-capable models. Forwarded to wx.ai as
    * `reasoning_effort`. Verified to scale chain-of-thought length on
@@ -60,14 +42,14 @@ var watsonxLanguageModelOptions = import_zod.z.object({
    * Models without reasoning capability (e.g. `ibm/granite-4-h-small`)
    * accept the field but produce no `reasoning_content` regardless.
    */
-  reasoningEffort: import_zod.z.enum(["low", "medium", "high"]).optional()
+  reasoningEffort: z.enum(["low", "medium", "high"]).optional()
 });
 
 // src/watsonx-config.ts
 var WATSONX_API_VERSION = "2026-04-20";
 
 // src/watsonx-iam.ts
-var import_provider = require("@ai-sdk/provider");
+import { LoadAPIKeyError } from "@ai-sdk/provider";
 var tokenCache = /* @__PURE__ */ new Map();
 var pendingRequests = /* @__PURE__ */ new Map();
 async function getIAMToken(apiKey) {
@@ -106,7 +88,7 @@ async function fetchIAMToken(apiKey) {
   }
   if (!response.ok) {
     const text = await response.text();
-    throw new import_provider.LoadAPIKeyError({
+    throw new LoadAPIKeyError({
       message: `Failed to get IBM IAM token: ${response.status} - ${text}`
     });
   }
@@ -122,102 +104,102 @@ function invalidateIAMToken(apiKey) {
 }
 
 // src/watsonx-schemas.ts
-var import_zod2 = require("zod");
-var watsonxErrorSchema = import_zod2.z.object({
-  errors: import_zod2.z.array(
-    import_zod2.z.object({
-      code: import_zod2.z.string(),
-      message: import_zod2.z.string(),
-      more_info: import_zod2.z.string().optional()
+import { z as z2 } from "zod";
+var watsonxErrorSchema = z2.object({
+  errors: z2.array(
+    z2.object({
+      code: z2.string(),
+      message: z2.string(),
+      more_info: z2.string().optional()
     }).loose()
   ).optional(),
-  error: import_zod2.z.string().optional(),
-  message: import_zod2.z.string().optional(),
+  error: z2.string().optional(),
+  message: z2.string().optional(),
   // wx.ai variants return either; coerce to one via preprocess.
-  statusCode: import_zod2.z.number().optional()
+  statusCode: z2.number().optional()
 }).loose().transform((val) => {
   const raw = val;
   return { ...val, statusCode: val.statusCode ?? raw.status_code };
 });
-var watsonxChatResponseSchema = import_zod2.z.object({
-  id: import_zod2.z.string().nullish(),
-  model_id: import_zod2.z.string().nullish(),
-  created: import_zod2.z.number().nullish(),
-  choices: import_zod2.z.array(
-    import_zod2.z.object({
-      index: import_zod2.z.number(),
-      message: import_zod2.z.object({
-        role: import_zod2.z.literal("assistant"),
-        content: import_zod2.z.string().nullish(),
-        reasoning_content: import_zod2.z.string().nullish(),
-        tool_calls: import_zod2.z.array(
-          import_zod2.z.object({
-            id: import_zod2.z.string(),
-            type: import_zod2.z.literal("function"),
-            function: import_zod2.z.object({
-              name: import_zod2.z.string(),
-              arguments: import_zod2.z.string()
+var watsonxChatResponseSchema = z2.object({
+  id: z2.string().nullish(),
+  model_id: z2.string().nullish(),
+  created: z2.number().nullish(),
+  choices: z2.array(
+    z2.object({
+      index: z2.number(),
+      message: z2.object({
+        role: z2.literal("assistant"),
+        content: z2.string().nullish(),
+        reasoning_content: z2.string().nullish(),
+        tool_calls: z2.array(
+          z2.object({
+            id: z2.string(),
+            type: z2.literal("function"),
+            function: z2.object({
+              name: z2.string(),
+              arguments: z2.string()
             }).loose()
           }).loose()
         ).optional()
       }).loose(),
-      finish_reason: import_zod2.z.string().nullish()
+      finish_reason: z2.string().nullish()
     }).loose()
   ),
-  usage: import_zod2.z.object({
-    prompt_tokens: import_zod2.z.number(),
-    completion_tokens: import_zod2.z.number(),
-    total_tokens: import_zod2.z.number(),
-    completion_tokens_details: import_zod2.z.object({ reasoning_tokens: import_zod2.z.number().optional() }).loose().optional()
+  usage: z2.object({
+    prompt_tokens: z2.number(),
+    completion_tokens: z2.number(),
+    total_tokens: z2.number(),
+    completion_tokens_details: z2.object({ reasoning_tokens: z2.number().optional() }).loose().optional()
   }).loose()
 });
-var watsonxChatChunkSchema = import_zod2.z.object({
-  id: import_zod2.z.string().nullish(),
-  model_id: import_zod2.z.string().nullish(),
-  created: import_zod2.z.number().nullish(),
-  choices: import_zod2.z.array(
-    import_zod2.z.object({
-      index: import_zod2.z.number().optional(),
-      delta: import_zod2.z.object({
-        role: import_zod2.z.string().optional(),
-        content: import_zod2.z.string().nullish(),
-        reasoning_content: import_zod2.z.string().nullish(),
-        tool_calls: import_zod2.z.array(
-          import_zod2.z.object({
-            index: import_zod2.z.number().optional(),
-            id: import_zod2.z.string().optional(),
-            type: import_zod2.z.string().optional(),
-            function: import_zod2.z.object({
-              name: import_zod2.z.string().optional(),
-              arguments: import_zod2.z.string().optional()
+var watsonxChatChunkSchema = z2.object({
+  id: z2.string().nullish(),
+  model_id: z2.string().nullish(),
+  created: z2.number().nullish(),
+  choices: z2.array(
+    z2.object({
+      index: z2.number().optional(),
+      delta: z2.object({
+        role: z2.string().optional(),
+        content: z2.string().nullish(),
+        reasoning_content: z2.string().nullish(),
+        tool_calls: z2.array(
+          z2.object({
+            index: z2.number().optional(),
+            id: z2.string().optional(),
+            type: z2.string().optional(),
+            function: z2.object({
+              name: z2.string().optional(),
+              arguments: z2.string().optional()
             }).loose().optional()
           }).loose()
         ).optional()
       }).loose().optional(),
-      finish_reason: import_zod2.z.string().nullish()
+      finish_reason: z2.string().nullish()
     }).loose()
   ).optional(),
-  usage: import_zod2.z.object({
-    prompt_tokens: import_zod2.z.number(),
-    completion_tokens: import_zod2.z.number(),
-    total_tokens: import_zod2.z.number().optional(),
-    completion_tokens_details: import_zod2.z.object({ reasoning_tokens: import_zod2.z.number().optional() }).loose().optional()
+  usage: z2.object({
+    prompt_tokens: z2.number(),
+    completion_tokens: z2.number(),
+    total_tokens: z2.number().optional(),
+    completion_tokens_details: z2.object({ reasoning_tokens: z2.number().optional() }).loose().optional()
   }).loose().optional()
 });
-var watsonxEmbeddingResponseSchema = import_zod2.z.object({
-  model_id: import_zod2.z.string().nullish(),
-  results: import_zod2.z.array(
-    import_zod2.z.object({
-      embedding: import_zod2.z.array(import_zod2.z.number()),
-      input_token_count: import_zod2.z.number().optional()
+var watsonxEmbeddingResponseSchema = z2.object({
+  model_id: z2.string().nullish(),
+  results: z2.array(
+    z2.object({
+      embedding: z2.array(z2.number()),
+      input_token_count: z2.number().optional()
     }).loose()
   ),
-  input_token_count: import_zod2.z.number().optional()
+  input_token_count: z2.number().optional()
 });
 
 // src/watsonx-error.ts
-var import_provider_utils = require("@ai-sdk/provider-utils");
-var watsonxErrorHandler = (0, import_provider_utils.createJsonErrorResponseHandler)({
+import { createJsonErrorResponseHandler } from "@ai-sdk/provider-utils";
+var watsonxErrorHandler = createJsonErrorResponseHandler({
   errorSchema: watsonxErrorSchema,
   errorToMessage: (error) => {
     if (error.errors?.[0]?.message) {
@@ -236,8 +218,10 @@ var watsonxErrorHandler = (0, import_provider_utils.createJsonErrorResponseHandl
 });
 
 // src/watsonx-chat-messages.ts
-var import_provider2 = require("@ai-sdk/provider");
-var import_provider_utils2 = require("@ai-sdk/provider-utils");
+import {
+  UnsupportedFunctionalityError
+} from "@ai-sdk/provider";
+import { convertUint8ArrayToBase64 } from "@ai-sdk/provider-utils";
 function convertToWatsonxMessages(options) {
   const messages = [];
   for (const message of options.prompt) {
@@ -252,7 +236,7 @@ function convertToWatsonxMessages(options) {
             parts.push({ type: "text", text: part.text });
           } else if (part.type === "file") {
             if (!part.mediaType.startsWith("image/")) {
-              throw new import_provider2.UnsupportedFunctionalityError({
+              throw new UnsupportedFunctionalityError({
                 functionality: `file parts with media type ${part.mediaType}`,
                 message: "watsonx.ai chat only supports image file parts; other media types are not supported."
               });
@@ -263,10 +247,10 @@ function convertToWatsonxMessages(options) {
             } else if (typeof part.data === "string") {
               imageUrl = part.data.startsWith("data:") || part.data.startsWith("http") ? part.data : `data:${part.mediaType};base64,${part.data}`;
             } else if (part.data instanceof Uint8Array) {
-              const base64 = (0, import_provider_utils2.convertUint8ArrayToBase64)(part.data);
+              const base64 = convertUint8ArrayToBase64(part.data);
               imageUrl = `data:${part.mediaType};base64,${base64}`;
             } else {
-              throw new import_provider2.UnsupportedFunctionalityError({
+              throw new UnsupportedFunctionalityError({
                 functionality: "file part with unknown data shape"
               });
             }
@@ -474,7 +458,7 @@ var WatsonxChatLanguageModel = class {
     return this.config.provider;
   }
   get generateId() {
-    return this.config.generateId ?? import_provider_utils3.generateId;
+    return this.config.generateId ?? defaultGenerateId;
   }
   async getArgs(options) {
     const warnings = [];
@@ -487,7 +471,7 @@ var WatsonxChatLanguageModel = class {
     if (options.seed != null) {
       warnings.push({ type: "unsupported", feature: "seed" });
     }
-    const watsonxOptions = await (0, import_provider_utils3.parseProviderOptions)({
+    const watsonxOptions = await parseProviderOptions({
       provider: "watsonx",
       providerOptions: options.providerOptions,
       schema: watsonxLanguageModelOptions
@@ -554,16 +538,16 @@ var WatsonxChatLanguageModel = class {
     const apiKey = this.config.apiKey();
     const call = async () => {
       const token = await getIAMToken(apiKey);
-      return (0, import_provider_utils3.postJsonToApi)({
+      return postJsonToApi({
         url: `${this.config.baseURL}/ml/v1/text/chat?version=${WATSONX_API_VERSION}`,
-        headers: (0, import_provider_utils3.combineHeaders)(
+        headers: combineHeaders(
           { Authorization: `Bearer ${token}` },
           this.config.headers(),
           options.headers
         ),
         body,
         failedResponseHandler: watsonxErrorHandler,
-        successfulResponseHandler: (0, import_provider_utils3.createJsonResponseHandler)(watsonxChatResponseSchema),
+        successfulResponseHandler: createJsonResponseHandler(watsonxChatResponseSchema),
         abortSignal: options.abortSignal,
         fetch: this.config.fetch
       });
@@ -574,7 +558,7 @@ var WatsonxChatLanguageModel = class {
     try {
       ({ value, rawValue, responseHeaders } = await call());
     } catch (error) {
-      if (import_provider3.APICallError.isInstance(error) && error.statusCode === 401) {
+      if (APICallError.isInstance(error) && error.statusCode === 401) {
         invalidateIAMToken(apiKey);
         ({ value, rawValue, responseHeaders } = await call());
       } else {
@@ -584,7 +568,7 @@ var WatsonxChatLanguageModel = class {
     const response = value;
     const choice = response.choices[0];
     if (!choice) {
-      throw new import_provider3.APICallError({
+      throw new APICallError({
         message: "No choices returned from watsonx.ai",
         url: `${this.config.baseURL}/ml/v1/text/chat?version=${WATSONX_API_VERSION}`,
         requestBodyValues: body,
@@ -632,16 +616,16 @@ var WatsonxChatLanguageModel = class {
     const composedSignal = options.abortSignal ? AbortSignal.any([options.abortSignal, stallController.signal]) : stallController.signal;
     const call = async () => {
       const token = await getIAMToken(apiKey);
-      return (0, import_provider_utils3.postJsonToApi)({
+      return postJsonToApi({
         url: `${this.config.baseURL}/ml/v1/text/chat_stream?version=${WATSONX_API_VERSION}`,
-        headers: (0, import_provider_utils3.combineHeaders)(
+        headers: combineHeaders(
           { Authorization: `Bearer ${token}` },
           this.config.headers(),
           options.headers
         ),
         body,
         failedResponseHandler: watsonxErrorHandler,
-        successfulResponseHandler: (0, import_provider_utils3.createEventSourceResponseHandler)(
+        successfulResponseHandler: createEventSourceResponseHandler(
           watsonxChatChunkSchema
         ),
         abortSignal: composedSignal,
@@ -652,7 +636,7 @@ var WatsonxChatLanguageModel = class {
     try {
       result = await call();
     } catch (error) {
-      if (import_provider3.APICallError.isInstance(error) && error.statusCode === 401) {
+      if (APICallError.isInstance(error) && error.statusCode === 401) {
         invalidateIAMToken(apiKey);
         result = await call();
       } else {
@@ -843,8 +827,14 @@ var WatsonxChatLanguageModel = class {
 };
 
 // src/watsonx-embedding-model.ts
-var import_provider4 = require("@ai-sdk/provider");
-var import_provider_utils4 = require("@ai-sdk/provider-utils");
+import {
+  TooManyEmbeddingValuesForCallError
+} from "@ai-sdk/provider";
+import {
+  postJsonToApi as postJsonToApi2,
+  createJsonResponseHandler as createJsonResponseHandler2,
+  combineHeaders as combineHeaders2
+} from "@ai-sdk/provider-utils";
 var WatsonxEmbeddingModel = class {
   specificationVersion = "v3";
   modelId;
@@ -869,7 +859,7 @@ var WatsonxEmbeddingModel = class {
   }
   async doEmbed(options) {
     if (options.values.length > this.maxEmbeddingsPerCall) {
-      throw new import_provider4.TooManyEmbeddingValuesForCallError({
+      throw new TooManyEmbeddingValuesForCallError({
         provider: this.provider,
         modelId: this.modelId,
         maxEmbeddingsPerCall: this.maxEmbeddingsPerCall,
@@ -887,16 +877,16 @@ var WatsonxEmbeddingModel = class {
         truncate_input_tokens: true
       };
     }
-    const { value: response, rawValue, responseHeaders } = await (0, import_provider_utils4.postJsonToApi)({
+    const { value: response, rawValue, responseHeaders } = await postJsonToApi2({
       url: `${this.config.baseURL}/ml/v1/text/embeddings?version=${WATSONX_API_VERSION}`,
-      headers: (0, import_provider_utils4.combineHeaders)(
+      headers: combineHeaders2(
         { Authorization: `Bearer ${token}` },
         this.config.headers(),
         options.headers
       ),
       body,
       failedResponseHandler: watsonxErrorHandler,
-      successfulResponseHandler: (0, import_provider_utils4.createJsonResponseHandler)(
+      successfulResponseHandler: createJsonResponseHandler2(
         watsonxEmbeddingResponseSchema
       ),
       abortSignal: options.abortSignal,
@@ -928,7 +918,7 @@ var VERSION = true ? "1.0.4" : "0.0.0-test";
 
 // src/watsonx-provider.ts
 function createWatsonx(options = {}) {
-  const baseURL = (0, import_provider_utils5.withoutTrailingSlash)(options.baseURL) ?? "https://us-south.ml.cloud.ibm.com";
+  const baseURL = withoutTrailingSlash(options.baseURL) ?? "https://us-south.ml.cloud.ibm.com";
   const getApiKey = () => {
     const apiKey = options.apiKey ?? process.env.WATSONX_AI_APIKEY;
     if (!apiKey) {
@@ -947,7 +937,7 @@ function createWatsonx(options = {}) {
     }
     return projectId;
   };
-  const getHeaders = () => (0, import_provider_utils5.withUserAgentSuffix)(
+  const getHeaders = () => withUserAgentSuffix(
     { ...options.headers },
     `ai-sdk/watsonx/${VERSION}`
   );
@@ -986,19 +976,18 @@ function createWatsonx(options = {}) {
   provider.embeddingModel = createEmbeddingModel;
   provider.textEmbeddingModel = createEmbeddingModel;
   provider.imageModel = (modelId) => {
-    throw new import_provider5.NoSuchModelError({ modelId, modelType: "imageModel" });
+    throw new NoSuchModelError({ modelId, modelType: "imageModel" });
   };
   return provider;
 }
 var watsonx = createWatsonx();
-// Annotate the CommonJS export names for ESM import in node:
-0 && (module.exports = {
+export {
   WATSONX_API_VERSION,
   WatsonxChatLanguageModel,
   WatsonxEmbeddingModel,
   createWatsonx,
-  createWatsonxProvider,
+  createWatsonx as createWatsonxProvider,
   watsonx,
   watsonxLanguageModelOptions
-});
-//# sourceMappingURL=index.js.map
+};
+//# sourceMappingURL=index.mjs.map
