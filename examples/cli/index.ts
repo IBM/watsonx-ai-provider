@@ -1,7 +1,6 @@
-import { createWatsonxProvider } from "watsonx-ai-provider";
-import { CoreMessage, streamText, tool } from "ai";
+import { createWatsonx } from "watsonx-ai-provider";
+import { ModelMessage, streamText, tool } from "ai";
 import * as readline from "node:readline/promises";
-import path from "path";
 import dotenv from "dotenv";
 import { z } from "zod";
 
@@ -12,29 +11,30 @@ const terminal = readline.createInterface({
   output: process.stdout,
 });
 
-const messages: CoreMessage[] = [];
+const messages: ModelMessage[] = [];
 
-const watsonx = createWatsonxProvider({ projectId: process.env.WATSONX_AI_PROJECT_ID });
+const watsonx = createWatsonx();
+
+const weatherTool = tool({
+  description: "Get the weather in a location",
+  inputSchema: z.object({
+    location: z.string().describe("The location to get the weather for"),
+  }),
+  execute: async ({ location }) => ({
+    location,
+    temperature: 72 + Math.floor(Math.random() * 21) - 10,
+  }),
+});
 
 async function main() {
   while (true) {
     messages.push({ role: "user", content: await terminal.question("You: ") });
 
     const result = streamText({
-      model: watsonx("ibm/granite-3-8b-instruct"),
-      maxSteps: 5,
+      model: watsonx("ibm/granite-4-h-small"),
       messages,
       tools: {
-        weather: tool({
-          description: "Get the weather in a location",
-          parameters: z.object({
-            location: z.string().describe("The location to get the weather for"),
-          }),
-          execute: async ({ location }) => ({
-            location,
-            temperature: 72 + Math.floor(Math.random() * 21) - 10,
-          }),
-        }),
+        weather: weatherTool,
       },
     });
 

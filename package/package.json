@@ -1,37 +1,86 @@
 {
   "name": "watsonx-ai-provider",
-  "author": "IBM",
   "version": "1.0.4",
-  "main": "dist/index.js",
-  "types": "dist/index.d.ts",
-  "license": "MIT",
-  "description": "watsonx.ai provider for Vercel AI SDK",
-  "keywords": [
-    "ai",
-    "ai sdk",
-    "ibm",
-    "vercel",
-    "watsonx",
-    "watsonx.ai"
-  ],
+  "description": "IBM watsonx.ai provider for the Vercel AI SDK - access Granite, OpenAI, Llama, Mistral, and other foundation models",
+  "license": "Apache-2.0",
+  "author": "IBM",
+  "homepage": "https://github.com/IBM/watsonx-ai-provider",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/ibm/watsonx-ai-provider.git",
+    "url": "https://github.com/IBM/watsonx-ai-provider.git",
     "directory": "package"
   },
-  "scripts": {
-    "build": "tsc"
+  "bugs": {
+    "url": "https://github.com/IBM/watsonx-ai-provider/issues"
   },
-  "files": [
-    "dist"
+  "keywords": [
+    "ai",
+    "vercel",
+    "sdk",
+    "watsonx",
+    "ibm",
+    "granite",
+    "llama",
+    "mistral",
+    "llm",
+    "language-model",
+    "embeddings",
+    "tool-calling",
+    "function-calling",
+    "streaming",
+    "ai-sdk",
+    "provider"
   ],
+  "sideEffects": false,
+  "main": "./dist/index.js",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist/**/*",
+    "README.md",
+    "LICENSE"
+  ],
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:e2e": "vitest run --config vitest.e2e.config.ts",
+    "typecheck": "tsc --noEmit",
+    "clean": "rm -rf dist",
+    "changeset": "changeset",
+    "version": "changeset version",
+    "release": "npm run build && changeset publish"
+  },
   "dependencies": {
-    "@ibm-cloud/watsonx-ai": "^1.6.4",
-    "ai": "^4.2.10"
+    "@ai-sdk/provider": "^3.0.8",
+    "@ai-sdk/provider-utils": "^4.0.23"
   },
   "devDependencies": {
-    "@types/node": "^22.13.17",
-    "tsx": "^4.19.3",
-    "typescript": "^5.8.2"
+    "@changesets/changelog-github": "^0.5.0",
+    "@changesets/cli": "^2.27.0",
+    "@types/node": "^20.0.0",
+    "dotenv": "^16.5.0",
+    "tsup": "^8.0.0",
+    "typescript": "^5.0.0",
+    "vitest": "^4.1.2"
+  },
+  "peerDependencies": {
+    "ai": "^6.0.0",
+    "zod": "^4.0.0"
+  },
+  "engines": {
+    "node": ">=20.3.0"
+  },
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
   }
 }

@@ -1,75 +1,90 @@
-import { LanguageModelV1, LanguageModelV1CallWarning, UnsupportedFunctionalityError } from "@ai-sdk/provider";
-import WatsonxAiMlVml_v1 from "@ibm-cloud/watsonx-ai/dist/watsonx-ai-ml/vml_v1";
+import {
+  type LanguageModelV3CallOptions,
+  type LanguageModelV3FunctionTool,
+  type SharedV3Warning,
+} from '@ai-sdk/provider';
 
-export function prepareTools(
-  mode: Parameters<LanguageModelV1["doGenerate"]>[0]["mode"] & {
-    type: "regular";
+interface WatsonxToolDefinition {
+  type: 'function';
+  function: {
+    name: string;
+    description?: string;
+    parameters: unknown;
+    strict?: boolean;
+  };
+}
+
+type WatsonxToolChoice =
+  | { tool_choice_option: 'auto' | 'none' | 'required' }
+  | {
+      tool_choice: {
+        type: 'function';
+        function: { name: string };
+      };
+    };
+
+export interface PreparedTools {
+  tools?: WatsonxToolDefinition[];
+  toolChoice?: WatsonxToolChoice;
+  toolWarnings: SharedV3Warning[];
+}
+
+/**
+ * Maps the SDK's `tools` and `toolChoice` call options into the wx.ai request
+ * shape. Surfaces warnings for non-function tools (wx.ai only supports
+ * function tools) and forwards the optional `strict` flag when present.
+ */
+export function prepareWatsonxTools(
+  options: Pick<LanguageModelV3CallOptions, 'tools' | 'toolChoice'>
+): PreparedTools {
+  const toolWarnings: SharedV3Warning[] = [];
+
+  if (!options.tools || options.tools.length === 0) {
+    return { toolWarnings };
   }
-): {
-  tools: WatsonxAiMlVml_v1.TextChatParameterTools[] | undefined;
-  toolChoice?: WatsonxAiMlVml_v1.TextChatToolChoiceTool;
-  toolWarnings: LanguageModelV1CallWarning[];
-  toolChoiceOption?: WatsonxAiMlVml_v1.TextChatConstants.ToolChoiceOption;
-} {
-  // when the tools array is empty, change it to undefined to prevent errors:
-  const tools = mode.tools?.length ? mode.tools : undefined;
-  const toolWarnings: LanguageModelV1CallWarning[] = [];
 
-  if (!tools) {
-    return { tools: undefined, toolChoice: undefined, toolWarnings };
-  }
-
-  const watsonxTools: WatsonxAiMlVml_v1.TextChatParameterTools[] = [];
-
-  for (const tool of tools) {
-    if (tool.type === "provider-defined") {
-      toolWarnings.push({ type: "unsupported-tool", tool });
-    } else {
-      watsonxTools.push({
-        type: "function",
-        function: {
-          name: tool.name,
-          description: tool.description,
-          parameters: tool.parameters,
-        },
+  for (const tool of options.tools) {
+    if (tool.type !== 'function') {
+      toolWarnings.push({
+        type: 'unsupported',
+        feature: `tool type '${tool.type}'`,
+        details: 'watsonx.ai only supports function tools',
       });
     }
   }
 
-  const toolChoice = mode.toolChoice;
-
-  if (!toolChoice) {
-    return { tools: watsonxTools, toolChoice: undefined, toolWarnings };
-  }
-
-  const type = toolChoice.type;
-
-  switch (type) {
-    case "auto":
-      return {
-        tools: watsonxTools,
-        toolChoiceOption: WatsonxAiMlVml_v1.TextChatConstants.ToolChoiceOption.AUTO,
-        toolWarnings,
+  const tools: WatsonxToolDefinition[] = options.tools
+    .filter((tool): tool is LanguageModelV3FunctionTool => tool.type === 'function')
+    .map((tool) => {
+      const fn: WatsonxToolDefinition['function'] = {
+        name: tool.name,
+        description: tool.description,
+        parameters: tool.inputSchema,
       };
-    case "none":
-      return { tools: [], toolChoiceOption: WatsonxAiMlVml_v1.TextChatConstants.ToolChoiceOption.NONE, toolWarnings };
-    case "required":
-      return {
-        tools: watsonxTools,
-        toolChoiceOption: WatsonxAiMlVml_v1.TextChatConstants.ToolChoiceOption.REQUIRED,
-        toolWarnings,
-      };
-    case "tool":
-      return {
-        tools: watsonxTools,
-        toolChoice: { type: "function", function: { name: toolChoice.toolName } },
-        toolWarnings,
-      };
-    default: {
-      const _exhaustiveCheck: never = type;
-      throw new UnsupportedFunctionalityError({
-        functionality: `Unsupported tool choice type: ${_exhaustiveCheck}`,
-      });
+      // Forward strict when present — wx.ai honours OpenAI's strict schema flag.
+      const strict = (tool as { strict?: boolean }).strict;
+      if (strict != null) fn.strict = strict;
+      return { type: 'function', function: fn };
+    });
+
+  let toolChoice: WatsonxToolChoice | undefined;
+  if (options.toolChoice) {
+    switch (options.toolChoice.type) {
+      case 'auto':
+      case 'none':
+      case 'required':
+        toolChoice = { tool_choice_option: options.toolChoice.type };
+        break;
+      case 'tool':
+        toolChoice = {
+          tool_choice: {
+            type: 'function',
+            function: { name: options.toolChoice.toolName },
+          },
+        };
+        break;
     }
   }
+
+  return { tools, toolChoice, toolWarnings };
 }

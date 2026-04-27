@@ -1,0 +1,53 @@
+name: Release
+
+on:
+  push:
+    branches: [main]
+
+# Avoid two release runs racing the same Version Packages PR.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: write       # bump package.json + write CHANGELOG + create tag
+  pull-requests: write  # open / update the Version Packages PR
+  id-token: write       # required for npm Trusted Publishing (OIDC) + provenance
+
+defaults:
+  run:
+    working-directory: package
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          registry-url: 'https://registry.npmjs.org'
+          cache: 'npm'
+          cache-dependency-path: package/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build
+        run: npm run build
+
+      # If there are pending changesets, this opens (or updates) a "Version
+      # Packages" PR that bumps the version + writes CHANGELOG. When that PR
+      # is merged, this same step runs again, finds no pending changesets,
+      # and runs `publish` instead — pushing to npm and tagging.
+      - name: Create release PR or publish
+        uses: changesets/action@v1
+        with:
+          cwd: package
+          version: npm run version
+          publish: npm run release
+          createGithubReleases: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
