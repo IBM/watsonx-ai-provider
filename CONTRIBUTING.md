@@ -65,10 +65,12 @@ The Release workflow only fires when `.changeset/*.md` files (other than `README
 
 **`.github/workflows/ci.yml`** runs on every PR/push to `main` (paths-filtered to `package/**`). Type-checks, runs unit tests, and builds. Tested against Node 20 and 22.
 
-**`.github/workflows/release.yml`** runs on every push to `main`. Uses `changesets/action@v1`:
+**`.github/workflows/release.yml`** runs on every push to `main`. It implements the Changesets release flow inline using shell + `gh` (the upstream `changesets/action@v1` is not on IBM's allowed-actions list):
 
-- If `.changeset/*.md` files exist → opens/updates the "Version Packages" PR
-- If no pending changesets and `package.json` was just bumped (i.e., the Version Packages PR was merged) → publishes to npm, creates the git tag, creates the GitHub Release
+- If `.changeset/*.md` files exist → runs `npx changeset version`, commits the bump on `changeset-release/main`, and opens/updates the "Version Packages" PR via `gh pr create`
+- If no pending changesets and `package.json` version is ahead of what's on npm (i.e., the Version Packages PR was merged) → publishes to npm with provenance, creates the git tag, creates the GitHub Release with the matching CHANGELOG section as the body
+
+The workflow only uses IBM-allowed actions (`actions/checkout`, `actions/setup-node`); everything else is shell. If you're tempted to "simplify" this back to `changesets/action@v1`, don't — it'll be blocked by IBM org policy at workflow-run time.
 
 ## One-time setup (kept for reference)
 
@@ -118,8 +120,9 @@ Then manually create the git tag and GitHub Release. Avoid this path; it bypasse
 ### The "Version Packages" PR isn't being created
 
 - Verify Settings → Actions → General has "Allow GitHub Actions to create and approve pull requests" enabled
-- Confirm at least one `.changeset/*.md` file exists on the source branch
-- Check the Release workflow run logs for permission errors
+- Confirm at least one `.changeset/*.md` file exists on `main` (other than `README.md`)
+- Check the Release workflow run logs for permission errors or `gh` failures
+- The workflow pushes to a branch named `changeset-release/main` — make sure no branch protection rule forbids the bot from pushing to that pattern
 
 ### A changeset was merged but the version isn't bumping correctly
 
