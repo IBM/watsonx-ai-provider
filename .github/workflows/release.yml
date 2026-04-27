@@ -54,6 +54,9 @@ jobs:
       - name: Run changeset version
         if: steps.pending.outputs.has_changesets == 'true'
         working-directory: package
+        env:
+          # @changesets/changelog-github fetches PR/commit metadata to build entries.
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: npx changeset version
 
       - name: Open or update Version Packages PR
