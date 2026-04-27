@@ -215,38 +215,12 @@ Models regularly change in wx.ai but here area a few starting points:
 | Reasoning (chain-of-thought) | `openai/gpt-oss-120b` with `providerOptions.watsonx.reasoningEffort: 'high'` | Verified to scale reasoning length ~3× from low to high effort. |
 | Coding (general — IDE assistant, debugging, code review) | `openai/gpt-oss-120b` | Best code capability in this catalog combined with reliable tool calling. |
 | Coding (cost-sensitive, focused tasks) | `ibm/granite-4-h-small` | Newer Granite family, 32B. Competitive code quality at significantly lower cost than gpt-oss. |
-| Coding agents (OpenCode, aider, Claude Code-style) | `openai/gpt-oss-120b` with `providerOptions.watsonx.reasoningEffort: 'high'` | Reliable streaming tool calls + 128K context + reasoning channel. The right choice within wx.ai for multi-step autonomous coding. See note below. |
 | Structured output / JSON schema | `ibm/granite-4-h-small`, `openai/gpt-oss-120b` | Granite-4 punches above its weight on schema-bounded output and is cheaper. |
 | Classification / summarization / extraction | `ibm/granite-4-h-small` | Bounded, focused tasks — ideal granite territory. |
 | Small / fast / cheap | `ibm/granite-4-h-small` | 32B params, low latency. Default for cost-sensitive workloads. |
 | Long-form prose | `meta-llama/llama-3-3-70b-instruct` | 128K context, strong instruction following. Granite-4 also works but with less nuance. |
 | Vision (image input) | `meta-llama/llama-3-2-11b-vision-instruct` | Accepts https image URLs directly. |
 | Embeddings | `ibm/granite-embedding-107m-multilingual` | Default embedding model for RAG. |
-
-### Using this provider with OpenCode and similar agents
-
-[OpenCode](https://opencode.ai), [aider](https://aider.chat), and most other AI SDK-compatible coding agents accept any provider that implements the AI SDK `LanguageModelV3` interface — which is exactly what this package exports. You can plug `watsonx-ai-provider` into them directly.
-
-Example for OpenCode (in `~/.config/opencode/opencode.json` or your project's `opencode.json`):
-
-```json
-{
-  "provider": {
-    "watsonx": {
-      "npm": "watsonx-ai-provider",
-      "name": "watsonx.ai",
-      "models": {
-        "openai/gpt-oss-120b": { "name": "GPT-OSS 120B (watsonx)" },
-        "meta-llama/llama-3-3-70b-instruct": { "name": "Llama 3.3 70B (watsonx)" }
-      }
-    }
-  }
-}
-```
-
-Make sure `WATSONX_AI_APIKEY` and `WATSONX_AI_PROJECT_ID` are set in the environment OpenCode runs in. The provider's default instance picks them up automatically.
-
-For aider and other tools, follow the tool's "custom OpenAI-compatible provider" or "AI SDK provider" docs — the integration shape varies but the underlying contract is the same.
 
 ## Regions
 
