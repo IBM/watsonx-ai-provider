@@ -2,6 +2,8 @@ node_modules/
 .npm
 .env
 .env.*
+!.env.example
+!example.env.*
 .DS_store
 
 # Personal working notes — never committed.

@@ -46,12 +46,12 @@ import { createWatsonx } from 'watsonx-ai-provider';
 const watsonx = createWatsonx({
   apiKey: process.env.MY_KEY,
   projectId: process.env.MY_PROJECT,
-  baseURL: 'https://eu-de.ml.cloud.ibm.com', // optional region override
-  headers: { 'X-Custom-Header': 'value' },   // optional extra headers
-  fetch: customFetch,                        // optional fetch override (testing, proxies, telemetry)
-  generateId: () => 'fixed-id',              // optional ID generator (deterministic test IDs)
+  baseURL: 'https://eu-de.ml.cloud.ibm.com', // optional region
+  fetch: customFetch,                        // optional — for testing/proxying
 });
 ```
+
+`createWatsonx` also accepts custom `headers` and a `generateId` function for deterministic test IDs.
 
 ## Streaming
 
@@ -100,62 +100,39 @@ console.log(result.toolCalls);
 
 ## Image input (vision)
 
-```typescript
-import { generateText } from 'ai';
-import { watsonx } from 'watsonx-ai-provider';
+Vision-capable models accept https image URLs, data URLs, and `Uint8Array` directly:
 
+```typescript
 const { text } = await generateText({
   model: watsonx('meta-llama/llama-3-2-11b-vision-instruct'),
-  messages: [
-    {
-      role: 'user',
-      content: [
-        { type: 'text', text: 'Describe this image.' },
-        { type: 'image', image: 'https://example.com/image.jpg' },
-      ],
-    },
-  ],
+  messages: [{
+    role: 'user',
+    content: [
+      { type: 'text', text: 'Describe this image.' },
+      { type: 'image', image: 'https://example.com/image.jpg' },
+    ],
+  }],
 });
 ```
-
-Vision-capable models accept https image URLs directly; data URLs and `Uint8Array` are also supported.
 
 ## Text embeddings
 
 ```typescript
-import { embed, embedMany } from 'ai';
+import { embedMany } from 'ai';
 import { watsonx } from 'watsonx-ai-provider';
 
-// Single embedding
-const { embedding } = await embed({
-  model: watsonx.embeddingModel('ibm/granite-embedding-107m-multilingual'),
-  value: 'What is machine learning?',
-});
-
-// Batch (up to 100 inputs per call)
 const { embeddings } = await embedMany({
   model: watsonx.embeddingModel('ibm/granite-embedding-107m-multilingual'),
-  values: ['First document', 'Second document', 'Third document'],
+  values: ['First document', 'Second document'], // up to 100 per call
 });
+// `embed()` works for single inputs.
 ```
 
 Available embedding models include `ibm/granite-embedding-107m-multilingual` and `ibm/slate-125m-english-rtrvr-v2`.
 
 ## Generation parameters
 
-Standard generation parameters go on the call (not the model factory):
-
-```typescript
-await generateText({
-  model: watsonx('openai/gpt-oss-120b'),
-  temperature: 0.7,
-  maxOutputTokens: 2048,
-  topP: 0.9,
-  topK: 50,
-  stopSequences: ['\n\n'],
-  prompt: '...',
-});
-```
+Standard generation parameters (`temperature`, `topP`, `topK`, `maxOutputTokens`, `stopSequences`) go on the `generateText`/`streamText` call, not the model factory. See [AI SDK call options](https://sdk.vercel.ai/docs/reference/ai-sdk-core/generate-text) for the full list.
 
 ## watsonx-specific options
 
@@ -214,15 +191,28 @@ await generateText({
 });
 ```
 
-## Recommended models
+## Models
 
-Different workloads have different sweet spots within the watsonx.ai catalog. As of v2.0.0:
+Pass any chat model ID available in your watsonx.ai project:
 
+```typescript
+watsonx('openai/gpt-oss-120b')
+watsonx('meta-llama/llama-3-3-70b-instruct')
+watsonx('ibm/granite-4-h-small')
+watsonx('mistralai/mistral-small-3-1-24b-instruct-2503')
+watsonx('your-org/your-custom-model')
+```
+
+For the full live list, see [Supported foundation models](https://www.ibm.com/docs/en/watsonx/saas?topic=solutions-supported-foundation-models). IBM rotates models in and out, so an ID that worked last quarter may now return a "model not found" error — check the linked catalog for current availability.
+
+### Recommendations by workload
+
+Models regularly change in wx.ai but here area a few starting points:
 | Workload | Recommended | Why |
 |---|---|---|
 | General chat | `openai/gpt-oss-120b` | Strong all-rounder; reliable streaming + tool calls. |
 | Streaming + tool calls | `openai/gpt-oss-120b`, `meta-llama/llama-3-3-70b-instruct`, `ibm/granite-4-h-small` | All three stream tool-call tokens correctly. Avoid `mistralai/mistral-medium-2505` here (wx.ai-side bug). |
-| Reasoning (chain-of-thought) | `openai/gpt-oss-120b` with `providerOptions.watsonx.reasoningEffort: 'high'` | Surfaces reasoning content as a separate stream channel. |
+| Reasoning (chain-of-thought) | `openai/gpt-oss-120b` with `providerOptions.watsonx.reasoningEffort: 'high'` | Verified to scale reasoning length ~3× from low to high effort. |
 | Coding (general — IDE assistant, debugging, code review) | `openai/gpt-oss-120b` | Best code capability in this catalog combined with reliable tool calling. |
 | Coding (cost-sensitive, focused tasks) | `ibm/granite-4-h-small` | Newer Granite family, 32B. Competitive code quality at significantly lower cost than gpt-oss. |
 | Coding agents (OpenCode, aider, Claude Code-style) | `openai/gpt-oss-120b` with `providerOptions.watsonx.reasoningEffort: 'high'` | Reliable streaming tool calls + 128K context + reasoning channel. The right choice within wx.ai for multi-step autonomous coding. See note below. |
@@ -232,10 +222,6 @@ Different workloads have different sweet spots within the watsonx.ai catalog. As
 | Long-form prose | `meta-llama/llama-3-3-70b-instruct` | 128K context, strong instruction following. Granite-4 also works but with less nuance. |
 | Vision (image input) | `meta-llama/llama-3-2-11b-vision-instruct` | Accepts https image URLs directly. |
 | Embeddings | `ibm/granite-embedding-107m-multilingual` | Default embedding model for RAG. |
-
-These are starting points, not absolutes — actual choice depends on your latency/cost/quality tradeoffs and which models are enabled in your specific watsonx.ai project. The IBM catalog updates frequently; this list reflects what's stable as of the v2.0.0 release date.
-
-> **Frontier coding caveat:** Within wx.ai, `gpt-oss-120b` is the right call for coding agents. **Across all providers**, frontier-tier coding agents (Claude Code with Sonnet/Opus, Cursor with GPT-5/Claude) will still outperform anything on wx.ai for serious agentic coding. Use this provider when you specifically need IBM-hosted inference, watsonx project credits, or compliance/sovereignty constraints — not because it's the absolute best coding backend.
 
 ### Using this provider with OpenCode and similar agents
 
@@ -262,18 +248,6 @@ Make sure `WATSONX_AI_APIKEY` and `WATSONX_AI_PROJECT_ID` are set in the environ
 
 For aider and other tools, follow the tool's "custom OpenAI-compatible provider" or "AI SDK provider" docs — the integration shape varies but the underlying contract is the same.
 
-## Available models
-
-The [Recommended models](#recommended-models) table covers the common cases. To use any other chat model from your watsonx.ai project, just pass its ID:
-
-```typescript
-watsonx('mistralai/mistral-small-3-1-24b-instruct-2503')
-watsonx('meta-llama/llama-3-2-3b-instruct')
-watsonx('your-org/your-custom-model')
-```
-
-For the full live list of supported model IDs, see [Supported foundation models](https://www.ibm.com/docs/en/watsonx/saas?topic=solutions-supported-foundation-models). IBM rotates models in and out, so an ID that worked last quarter may now return a "model not found" error — check the linked catalog for current availability.
-
 ## Regions
 
 watsonx.ai is available in multiple regions; pass `baseURL` to `createWatsonx`:
@@ -287,27 +261,7 @@ watsonx.ai is available in multiple regions; pass `baseURL` to `createWatsonx`:
 
 ## Error handling
 
-Standard AI SDK error classes:
-
-```typescript
-import { generateText } from 'ai';
-import { APICallError } from '@ai-sdk/provider';
-
-try {
-  const { text } = await generateText({
-    model: watsonx('invalid/model'),
-    prompt: 'Hello',
-  });
-} catch (error) {
-  if (APICallError.isInstance(error)) {
-    console.log('Status:', error.statusCode);
-    console.log('Message:', error.message);
-    console.log('Retryable:', error.isRetryable);
-  }
-}
-```
-
-Cached IAM tokens automatically refresh on a `401` response (one-shot retry per call).
+Errors surface as standard AI SDK `APICallError` instances — check with `APICallError.isInstance(err)` and read `.statusCode`, `.message`, `.isRetryable`. Cached IAM tokens automatically refresh on a `401` response (one-shot retry per call).
 
 ## Debug logging
 
@@ -317,119 +271,27 @@ The provider also surfaces a `console.warn` whenever a stream finishes with `com
 
 ## TypeScript
 
-Full TypeScript support is included:
+Full TypeScript support. Public exports:
 
 ```typescript
-import type {
-  WatsonxProvider,
-  WatsonxProviderSettings,
-  WatsonxChatModelId,
-  WatsonxLanguageModelOptions,
-} from 'watsonx-ai-provider';
-
 import {
-  watsonx,                        // default instance
-  createWatsonx,                  // factory for custom config
-  watsonxLanguageModelOptions,    // zod schema for providerOptions.watsonx
+  watsonx,                       // default instance
+  createWatsonx,                 // factory for custom config
+  watsonxLanguageModelOptions,   // zod schema for providerOptions.watsonx
+  type WatsonxProvider,
+  type WatsonxProviderSettings,
+  type WatsonxChatModelId,
+  type WatsonxLanguageModelOptions,
 } from 'watsonx-ai-provider';
 ```
 
-## Migration from v1.x
+## Upgrading
 
-v2.0.0 includes breaking changes. Most callers only need a couple of mechanical updates.
-
-### Constructor / factory signature
-
-```diff
-- const model = watsonx('openai/gpt-oss-120b', { temperature: 0.7, maxTokens: 2048 });
-+ const model = watsonx('openai/gpt-oss-120b');
-+ // Pass temperature, maxOutputTokens, etc. on the generateText/streamText call:
-+ await generateText({ model, temperature: 0.7, maxOutputTokens: 2048, prompt: '...' });
-```
-
-The second `settings` argument is removed. Standard generation parameters now flow through `LanguageModelV3CallOptions`. wx.ai-specific knobs (the only one that was unique was `timeLimit`) move to `providerOptions.watsonx`.
-
-### Provider strings
-
-If you check `model.provider` (e.g. for telemetry), note that chat models now report `'watsonx.chat'` and embedding models report `'watsonx.embedding'` (was `'watsonx'` for both).
-
-### Auth simplification
-
-`WATSONX_AI_AUTH_TYPE` is no longer used. v2 only supports IAM authentication.
-
-### Direct REST API
-
-The `@ibm-cloud/watsonx-ai` SDK is no longer a dependency. The provider hits `/ml/v1/text/chat` and `/ml/v1/text/chat_stream` directly via `postJsonToApi`.
-
-### `WatsonxChatSettings` removed
-
-If you imported the `WatsonxChatSettings` type, replace it with `WatsonxLanguageModelOptions`:
-
-```diff
-- import type { WatsonxChatSettings } from 'watsonx-ai-provider';
-+ import type { WatsonxLanguageModelOptions } from 'watsonx-ai-provider';
-```
-
-The fields are different — see "watsonx-specific options" above.
-
-### `zod` v4 required
-
-Peer dependency tightened from `^3.25.0 || ^4.0.0` to `^4.0.0`. The provider uses `.loose()` which is zod v4-only. If you're on zod v3, upgrade before installing v2.
-
-### `createWatsonxProvider` alias
-
-Still works as an alias for `createWatsonx`, but is now marked `@deprecated`. Update imports to silence editor warnings:
-
-```diff
-- import { createWatsonxProvider } from 'watsonx-ai-provider';
-+ import { createWatsonx } from 'watsonx-ai-provider';
-```
+- **From v1.x**: see [`MIGRATION.md`](https://github.com/IBM/watsonx-ai-provider/blob/main/package/MIGRATION.md) for the v1 → v2 guide.
 
 ## Contributing
 
-Releases are managed by [Changesets](https://github.com/changesets/changesets). When you open a PR, decide whether your change should produce a new published version of the package. The rule of thumb: **does this change anything a consumer of `watsonx-ai-provider` would observe at runtime, type-time, or peer-dep time?**
-
-### Add a changeset
-
-If yes — run from the `package/` directory:
-
-```bash
-npm run changeset
-```
-
-The CLI asks for a bump type and a one-line summary. Commit the resulting `.changeset/<random-name>.md` alongside your code change. Bump-type guide:
-
-| Bump | When to pick |
-|---|---|
-| **`patch`** | Bug fix, internal correctness, no API or behavior shift visible to typical callers |
-| **`minor`** | New feature, new option, new export — backwards-compatible |
-| **`major`** | Removed/renamed export, changed function signature, raised peer-dep range, changed runtime behavior in a way that could break callers |
-
-When the PR merges to `main`, the Release workflow opens (or updates) a "Version Packages" PR aggregating all pending changesets. Merging that PR publishes to npm and creates the GitHub Release.
-
-### Skip the changeset
-
-If your change has **zero impact on the published package**, no changeset is needed. Common cases:
-
-- Documentation-only edits (README, PUBLISHING, repo-root markdown)
-- CI / GitHub Actions tweaks (`.github/workflows/`)
-- Test-only changes (no production code touched)
-- `examples/` updates (not part of the published package — `files` in `package.json` only ships `dist/` + README + LICENSE)
-- Repo tooling (`.gitignore`, `.editorconfig`, etc.)
-- Internal refactors with byte-identical compiled output (e.g. renaming a private variable or extracting a helper used in one place)
-- Comment / typo fixes inside source files
-
-If a reviewer questions whether a changeset is needed, the safe answer is to add a `patch` changeset describing the user-visible effect (or "internal change, no user impact" if there isn't one). You can also create an explicit empty changeset to record the intent:
-
-```bash
-npm run changeset -- --empty
-```
-
-This produces a `.changeset/*.md` with no version bump but a recorded summary — useful if a reviewer wants to see the change deliberately marked as no-release.
-
-### Avoiding accidental releases
-
-The Release workflow only fires when `.changeset/*.md` files (other than `README.md`) exist on `main`. To save in-progress changeset content without triggering it, use a non-`.md` extension like `<name>.md.draft` — Changesets ignores anything that doesn't end in `.md`.
+See [`CONTRIBUTING.md`](https://github.com/IBM/watsonx-ai-provider/blob/main/CONTRIBUTING.md) at the repo root for the changeset / release flow.
 
 ## License
 
