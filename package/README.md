@@ -59,7 +59,7 @@ const watsonx = createWatsonx({
 
 ## Using with opencode
 
-[opencode](https://opencode.ai/) can load this package as a custom provider so watsonx.ai models appear in its model picker. See [`OPENCODE.md`](https://github.com/IBM/watsonx-ai-provider/blob/main/OPENCODE.md) for the full setup (auth flow, `opencode.json` block, model list).
+[opencode](https://opencode.ai/) can load this package as a custom provider so watsonx.ai models appear in its model picker. See [`OPENCODE.md`](https://github.com/IBM/watsonx-ai-provider/blob/main/OPENCODE.md) for the full setup.
 
 ## Streaming
 
@@ -144,7 +144,7 @@ Standard generation parameters (`temperature`, `topP`, `topK`, `maxOutputTokens`
 
 ## watsonx-specific options
 
-wx.ai-only knobs go through `providerOptions.watsonx`:
+wx.ai-only settings go through `providerOptions.watsonx`:
 
 ```typescript
 await generateText({
@@ -167,7 +167,7 @@ These are validated via the exported `watsonxLanguageModelOptions` zod schema if
 
 ## JSON / structured output
 
-For structured output, the idiomatic AI SDK API is `generateObject`:
+For structured output, the standard AI SDK API is `generateObject`:
 
 ```typescript
 import { generateObject } from 'ai';
@@ -211,8 +211,7 @@ watsonx('mistralai/mistral-small-3-1-24b-instruct-2503')
 watsonx('your-org/your-custom-model')
 ```
 
-For the full live list, see [Supported foundation models](https://www.ibm.com/docs/en/watsonx/saas?topic=solutions-supported-foundation-models). IBM rotates models in and out, so an ID that worked last quarter may now return a "model not found" error — check the linked catalog for current availability.
-
+For the full live list, see [Supported foundation models](https://www.ibm.com/docs/en/watsonx/saas?topic=solutions-supported-foundation-models). Be aware that models are often retired.
 ### Recommendations by workload
 
 Models regularly change in wx.ai but here area a few starting points:
@@ -221,14 +220,14 @@ Models regularly change in wx.ai but here area a few starting points:
 | General chat | `openai/gpt-oss-120b` | Strong all-rounder; reliable streaming + tool calls. |
 | Streaming + tool calls | `openai/gpt-oss-120b`, `meta-llama/llama-3-3-70b-instruct`, `ibm/granite-4-h-small` | All three stream tool-call tokens correctly. Avoid `mistralai/mistral-medium-2505` here (wx.ai-side bug). |
 | Reasoning (chain-of-thought) | `openai/gpt-oss-120b` with `providerOptions.watsonx.reasoningEffort: 'high'` | Verified to scale reasoning length ~3× from low to high effort. |
-| Coding (general — IDE assistant, debugging, code review) | `openai/gpt-oss-120b` | Best code capability in this catalog combined with reliable tool calling. |
+| Coding | `openai/gpt-oss-120b` | Best for coding and reliable tool calling. |
 | Coding (cost-sensitive, focused tasks) | `ibm/granite-4-h-small` | Newer Granite family, 32B. Competitive code quality at significantly lower cost than gpt-oss. |
 | Structured output / JSON schema | `ibm/granite-4-h-small`, `openai/gpt-oss-120b` | Granite-4 punches above its weight on schema-bounded output and is cheaper. |
 | Classification / summarization / extraction | `ibm/granite-4-h-small` | Bounded, focused tasks — ideal granite territory. |
 | Small / fast / cheap | `ibm/granite-4-h-small` | 32B params, low latency. Default for cost-sensitive workloads. |
-| Long-form prose | `meta-llama/llama-3-3-70b-instruct` | 128K context, strong instruction following. Granite-4 also works but with less nuance. |
+| Writing | `meta-llama/llama-3-3-70b-instruct` | 128K context, strong instruction following. Granite-4 also works but with less nuance. |
 | Vision (image input) | `meta-llama/llama-3-2-11b-vision-instruct` | Accepts https image URLs directly. |
-| Embeddings | `ibm/granite-embedding-107m-multilingual` | Default embedding model for RAG. |
+| Embeddings | `ibm/granite-embedding-107m-multilingual` | A good embedding model for RAG. |
 
 ## Regions
 
