@@ -57,6 +57,10 @@ const watsonx = createWatsonx({
 
 `createWatsonx` also accepts custom `headers` and a `generateId` function for deterministic test IDs.
 
+## Using with opencode
+
+[opencode](https://opencode.ai/) can load this package as a custom provider so watsonx.ai models appear in its model picker. See [`OPENCODE.md`](https://github.com/IBM/watsonx-ai-provider/blob/main/OPENCODE.md) for the full setup (auth flow, `opencode.json` block, model list).
+
 ## Streaming
 
 ```typescript
