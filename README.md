@@ -1,4 +1,4 @@
-# watsonx-ai-provider
+# IBM watsonx.ai Provider for Vercel AI SDK
 
 [![npm version](https://img.shields.io/npm/v/watsonx-ai-provider.svg)](https://www.npmjs.com/package/watsonx-ai-provider)
 [![npm downloads](https://img.shields.io/npm/dm/watsonx-ai-provider.svg)](https://www.npmjs.com/package/watsonx-ai-provider)
