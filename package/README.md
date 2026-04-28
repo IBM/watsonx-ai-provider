@@ -1,5 +1,9 @@
 # IBM watsonx.ai Provider for Vercel AI SDK
 
+[![npm version](https://img.shields.io/npm/v/watsonx-ai-provider.svg)](https://www.npmjs.com/package/watsonx-ai-provider)
+[![npm downloads](https://img.shields.io/npm/dm/watsonx-ai-provider.svg)](https://www.npmjs.com/package/watsonx-ai-provider)
+[![License](https://img.shields.io/npm/l/watsonx-ai-provider.svg)](https://github.com/IBM/watsonx-ai-provider/blob/main/LICENSE)
+
 The **watsonx.ai provider** for the [Vercel AI SDK](https://sdk.vercel.ai/docs) enables integration with IBM watsonx.ai foundation models, including Granite, OpenAI, Meta Llama, Mistral, and other models hosted on watsonx.ai.
 
 ## Installation
