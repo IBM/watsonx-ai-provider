@@ -110,6 +110,13 @@ jobs:
             echo "Already published: $LOCAL"
           fi
 
+      # Trusted Publishing (OIDC, no NPM_TOKEN) requires npm >= 11.5.1.
+      # actions/setup-node@v5 with Node 20 ships npm 10.x, which signs
+      # provenance but fails the OIDC publish handshake (404 on PUT).
+      - name: Upgrade npm for Trusted Publishing
+        if: steps.pending.outputs.has_changesets == 'false' && steps.publish_check.outputs.needs_publish == 'true'
+        run: npm install -g npm@latest
+
       - name: Publish to npm (Trusted Publishing / OIDC)
         if: steps.pending.outputs.has_changesets == 'false' && steps.publish_check.outputs.needs_publish == 'true'
         working-directory: package
