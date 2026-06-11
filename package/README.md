@@ -190,11 +190,20 @@ console.log(object); // typed as inferred from schema
 This compiles down to a `responseFormat` request on the model. If you need direct control at the lower level, the provider also honors `responseFormat` on `generateText`/`streamText` calls:
 
 ```typescript
+const resultSchema = {
+  type: 'object',
+  properties: {
+    title: { type: 'string' },
+    summary: { type: 'string' },
+  },
+  required: ['title', 'summary'],
+  additionalProperties: false,
+} as const;
+
 await generateText({
   model: watsonx('openai/gpt-oss-120b'),
-  responseFormat: { type: 'json' },              // free-form JSON
-  // or with a schema:
-  responseFormat: { type: 'json', schema: yourZodSchema, name: 'Result' },
+  // Use { type: 'json' } for free-form JSON, or include a JSON Schema:
+  responseFormat: { type: 'json', schema: resultSchema, name: 'Result' },
   prompt: 'Return a JSON object describing ...',
 });
 ```
