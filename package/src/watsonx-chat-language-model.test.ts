@@ -648,4 +648,122 @@ describe('WatsonxChatLanguageModel', () => {
       });
     });
   });
+
+  describe('reasoning', () => {
+    beforeEach(() => {
+      global.fetch = vi.fn().mockImplementation((url: string) => {
+        if (url.includes('iam.cloud.ibm.com')) {
+          return createMockFetch({ response: createMockIAMResponse() })();
+        }
+        return createMockFetch({ response: createMockChatResponse({}) })();
+      });
+    });
+
+    // ai@7 forwards its top-level `reasoning` option to v3 models; it isn't in
+    // LanguageModelV3CallOptions, hence the cast.
+    async function generateWith(options: Record<string, unknown>) {
+      const model = createTestModel('openai/gpt-oss-120b');
+      const result = await model.doGenerate({
+        prompt: createSimplePrompt(),
+        ...options,
+      } as LanguageModelV3CallOptions);
+      const chatCall = (global.fetch as ReturnType<typeof vi.fn>).mock.calls.find(
+        (call) => call[0].includes('/ml/v1/text/chat')
+      );
+      return { requestBody: JSON.parse(chatCall![1].body), warnings: result.warnings };
+    }
+
+    it('should forward providerOptions.watsonx.reasoningEffort', async () => {
+      const { requestBody } = await generateWith({
+        providerOptions: { watsonx: { reasoningEffort: 'medium' } },
+      });
+      expect(requestBody.reasoning_effort).toBe('medium');
+    });
+
+    it.each(['low', 'medium', 'high'])(
+      'should map top-level reasoning "%s" directly',
+      async (level) => {
+        const { requestBody, warnings } = await generateWith({ reasoning: level });
+        expect(requestBody.reasoning_effort).toBe(level);
+        expect(warnings).toEqual([]);
+      }
+    );
+
+    it.each([
+      ['minimal', 'low'],
+      ['xhigh', 'high'],
+      ['max', 'high'],
+    ])('should clamp top-level reasoning "%s" to "%s" with a warning', async (level, effort) => {
+      const { requestBody, warnings } = await generateWith({ reasoning: level });
+      expect(requestBody.reasoning_effort).toBe(effort);
+      expect(warnings).toEqual([
+        expect.objectContaining({ type: 'compatibility', feature: 'reasoning' }),
+      ]);
+    });
+
+    it('should omit reasoning_effort and warn for reasoning "none"', async () => {
+      const { requestBody, warnings } = await generateWith({ reasoning: 'none' });
+      expect(requestBody).not.toHaveProperty('reasoning_effort');
+      expect(warnings).toEqual([
+        expect.objectContaining({ type: 'unsupported', feature: 'reasoning' }),
+      ]);
+    });
+
+    it('should omit reasoning_effort for reasoning "provider-default"', async () => {
+      const { requestBody, warnings } = await generateWith({ reasoning: 'provider-default' });
+      expect(requestBody).not.toHaveProperty('reasoning_effort');
+      expect(warnings).toEqual([]);
+    });
+
+    it('should warn on unknown reasoning levels', async () => {
+      const { requestBody, warnings } = await generateWith({ reasoning: 'ultra' });
+      expect(requestBody).not.toHaveProperty('reasoning_effort');
+      expect(warnings).toEqual([
+        expect.objectContaining({ type: 'unsupported', feature: 'reasoning' }),
+      ]);
+    });
+
+    it('should prefer providerOptions.watsonx.reasoningEffort over top-level reasoning', async () => {
+      const { requestBody, warnings } = await generateWith({
+        reasoning: 'max',
+        providerOptions: { watsonx: { reasoningEffort: 'low' } },
+      });
+      expect(requestBody.reasoning_effort).toBe('low');
+      expect(warnings).toEqual([]);
+    });
+
+    it('should map top-level reasoning when streaming', async () => {
+      global.fetch = vi.fn().mockImplementation((url: string) => {
+        if (url.includes('iam.cloud.ibm.com')) {
+          return createMockFetch({ response: createMockIAMResponse() })();
+        }
+        const stream = new ReadableStream({
+          start(controller) {
+            controller.enqueue(new TextEncoder().encode('data: [DONE]\n\n'));
+            controller.close();
+          },
+        });
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          headers: new Headers(),
+          url: 'https://test.com',
+          body: stream,
+        });
+      });
+
+      const model = createTestModel('openai/gpt-oss-120b');
+      const result = await model.doStream({
+        prompt: createSimplePrompt(),
+        reasoning: 'xhigh',
+      } as LanguageModelV3CallOptions);
+
+      expect(result.request?.body).toMatchObject({ reasoning_effort: 'high' });
+      const { value: firstPart } = await result.stream.getReader().read();
+      expect(firstPart).toEqual({
+        type: 'stream-start',
+        warnings: [expect.objectContaining({ type: 'compatibility', feature: 'reasoning' })],
+      });
+    });
+  });
 });

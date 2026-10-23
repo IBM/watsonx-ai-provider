@@ -2,6 +2,7 @@ import type {
   LanguageModelV3FinishReason,
   LanguageModelV3ResponseMetadata,
   LanguageModelV3Usage,
+  SharedV3Warning,
 } from '@ai-sdk/provider';
 
 /**
@@ -52,6 +53,71 @@ export function convertFinishReason(
     unified = 'tool-calls';
   }
   return { unified, raw: reason };
+}
+
+/**
+ * AI SDK 7's top-level `reasoning` call option. It isn't part of the v3 spec,
+ * but ai@7's v3 compatibility adapter forwards it to v3 models. ai@6 never
+ * sets it.
+ */
+export type WatsonxReasoningLevel =
+  | 'provider-default'
+  | 'none'
+  | 'minimal'
+  | 'low'
+  | 'medium'
+  | 'high'
+  | 'xhigh'
+  | 'max';
+
+/**
+ * Maps the top-level `reasoning` level onto wx.ai's `reasoning_effort`, which
+ * only accepts low/medium/high. Out-of-range levels are clamped with a
+ * compatibility warning.
+ */
+export function mapReasoningEffort(
+  reasoning: WatsonxReasoningLevel | undefined,
+  warnings: SharedV3Warning[]
+): 'low' | 'medium' | 'high' | undefined {
+  switch (reasoning) {
+    case undefined:
+    case 'provider-default':
+      return undefined;
+    case 'low':
+    case 'medium':
+    case 'high':
+      return reasoning;
+    case 'minimal':
+      warnings.push({
+        type: 'compatibility',
+        feature: 'reasoning',
+        details: 'reasoning "minimal" is not supported by watsonx.ai; using reasoning_effort "low".',
+      });
+      return 'low';
+    case 'xhigh':
+    case 'max':
+      warnings.push({
+        type: 'compatibility',
+        feature: 'reasoning',
+        details: `reasoning "${reasoning}" is not supported by watsonx.ai; using reasoning_effort "high".`,
+      });
+      return 'high';
+    case 'none':
+      warnings.push({
+        type: 'unsupported',
+        feature: 'reasoning',
+        details: 'watsonx.ai has no way to turn reasoning off; the model default applies.',
+      });
+      return undefined;
+    default:
+      // Levels added to the AI SDK after this provider was released.
+      warnings.push({
+        type: 'unsupported',
+        feature: 'reasoning',
+        details: `reasoning "${reasoning as string}" is not supported by watsonx.ai.`,
+      });
+      return undefined;
+  }
 }
 
 // Granite models occasionally return tool-call arguments as a JSON-encoded

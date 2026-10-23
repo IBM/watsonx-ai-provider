@@ -12,7 +12,7 @@ The **watsonx.ai provider** for the [Vercel AI SDK](https://sdk.vercel.ai/docs) 
 npm install watsonx-ai-provider
 ```
 
-> **Compatibility:** v2.x targets AI SDK v6 and Node.js 20.3+. For AI SDK v4 use the v1.x line.
+> **Compatibility:** v2.x works with AI SDK v6 and v7 on Node.js 20.3+ (AI SDK v7 itself requires Node.js 22+). For AI SDK v4 use the v1.x line.
 
 ## Setup
 
@@ -165,6 +165,20 @@ await generateText({
 
 These are validated via the exported `watsonxLanguageModelOptions` zod schema if you want to pre-validate at your call site.
 
+### Reasoning effort
+
+On AI SDK v7 you can use the standard top-level `reasoning` option instead of `providerOptions.watsonx.reasoningEffort`:
+
+```typescript
+await generateText({
+  model: watsonx('openai/gpt-oss-120b'),
+  reasoning: 'high',
+  prompt: '...',
+});
+```
+
+wx.ai accepts `low`, `medium` and `high`. `minimal` is sent as `low` and `xhigh`/`max` as `high`, each with a compatibility warning. `none` isn't supported (wx.ai has no way to turn reasoning off), so the model default applies and a warning is returned. When both are set, `providerOptions.watsonx.reasoningEffort` wins. On AI SDK v6, use `providerOptions.watsonx.reasoningEffort`.
+
 ## JSON / structured output
 
 For structured output, the standard AI SDK API is `generateObject`:
@@ -219,7 +233,7 @@ Models regularly change in wx.ai but here area a few starting points:
 |---|---|---|
 | General chat | `openai/gpt-oss-120b` | Strong all-rounder; reliable streaming + tool calls. |
 | Streaming + tool calls | `openai/gpt-oss-120b`, `meta-llama/llama-3-3-70b-instruct`, `ibm/granite-4-h-small` | All three stream tool-call tokens correctly. Avoid `mistralai/mistral-medium-2505` here (wx.ai-side bug). |
-| Reasoning (chain-of-thought) | `openai/gpt-oss-120b` with `providerOptions.watsonx.reasoningEffort: 'high'` | Verified to scale reasoning length ~3× from low to high effort. |
+| Reasoning (chain-of-thought) | `openai/gpt-oss-120b` with `reasoning: 'high'` (AI SDK v7) or `providerOptions.watsonx.reasoningEffort: 'high'` | Verified to scale reasoning length ~3× from low to high effort. |
 | Coding | `openai/gpt-oss-120b` | Best for coding and reliable tool calling. |
 | Coding (cost-sensitive, focused tasks) | `ibm/granite-4-h-small` | Newer Granite family, 32B. Competitive code quality at significantly lower cost than gpt-oss. |
 | Structured output / JSON schema | `ibm/granite-4-h-small`, `openai/gpt-oss-120b` | Granite-4 punches above its weight on schema-bounded output and is cheaper. |

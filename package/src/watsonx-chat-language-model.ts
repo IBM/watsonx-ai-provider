@@ -34,7 +34,9 @@ import {
   convertFinishReason,
   convertUsage,
   getResponseMetadata,
+  mapReasoningEffort,
   parseToolCallArgs,
+  type WatsonxReasoningLevel,
 } from './watsonx-chat-helpers';
 
 // --- Main Model Class ---
@@ -127,8 +129,17 @@ export class WatsonxChatLanguageModel implements LanguageModelV3 {
     // `reasoning_effort` field. Verified to scale reasoning length monotonically
     // (baseline → low → medium → high) on gpt-oss-120b. Quarkus's `thinking`
     // block is silently ignored on wx.ai-hosted models, so we use this shape.
+    // providerOptions.watsonx.reasoningEffort wins over ai@7's top-level
+    // `reasoning` option.
     if (watsonxOptions?.reasoningEffort != null) {
       body.reasoning_effort = watsonxOptions.reasoningEffort;
+    } else {
+      const reasoning = (options as { reasoning?: WatsonxReasoningLevel })
+        .reasoning;
+      const reasoningEffort = mapReasoningEffort(reasoning, warnings);
+      if (reasoningEffort != null) {
+        body.reasoning_effort = reasoningEffort;
+      }
     }
 
     // responseFormat: wx.ai supports { type: 'json_object' } and json_schema.

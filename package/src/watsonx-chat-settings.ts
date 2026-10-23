@@ -48,6 +48,9 @@ export const watsonxLanguageModelOptions = z.object({
    *
    * Models without reasoning capability (e.g. `ibm/granite-4-h-small`)
    * accept the field but produce no `reasoning_content` regardless.
+   *
+   * On AI SDK v7 the top-level `reasoning` call option maps here too; this
+   * setting wins when both are set.
    */
   reasoningEffort: z.enum(['low', 'medium', 'high']).optional(),
 });
