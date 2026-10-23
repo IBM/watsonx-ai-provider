@@ -1,76 +1,68 @@
 # Contributing
 
-Thanks for your interest in contributing to `watsonx-ai-provider`. This guide covers the everyday flow (adding changes, opening PRs) and the release pipeline (Changesets + npm Trusted Publishing).
+Thanks for your interest in contributing to `watsonx-ai-provider`. This guide covers the everyday flow (making changes, opening PRs) and the release pipeline (GitHub Releases + npm Trusted Publishing).
 
 ## Day-to-day: making a change
 
-1. Make your code change on a feature branch.
-2. From the `package/` directory, decide whether the change should produce a new published version. The rule of thumb: **does this change anything a consumer of `watsonx-ai-provider` would observe at runtime, type-time, or peer-dep time?**
+1. Make your code change on a feature branch and open a PR against `main`. CI type-checks, tests, and builds it.
+2. **Don't bump the version in feature PRs.** Versions are bumped once per release (see [Releasing](#releasing)).
+3. **Write the PR title for users.** Release notes are generated from the titles of PRs merged since the previous release, so a title like `Support ai@7 peer dependency` ends up verbatim in the notes.
+4. If the change is breaking, say so in the PR description and update [`package/MIGRATION.md`](./package/MIGRATION.md) in the same PR.
 
-### Yes — add a changeset
+## Releasing
+
+Publishing a GitHub Release publishes that version to npm. Nothing is published by merging to `main`.
+
+### 1. Bump the version
+
+Open a PR that bumps the version, then merge it:
 
 ```bash
 cd package
-npm run changeset
+npm version minor --no-git-tag-version   # or patch / major — updates package.json + package-lock.json
 ```
-
-The CLI asks for a bump type and a one-line summary. Commit the resulting `.changeset/<random-name>.md` alongside your code change. Bump-type guide:
 
 | Bump | When to pick |
 |---|---|
 | **`patch`** | Bug fix, internal correctness, no API or behavior shift visible to typical callers |
-| **`minor`** | New feature, new option, new export — backwards-compatible |
-| **`major`** | Removed/renamed export, changed function signature, raised peer-dep range, changed runtime behavior in a way that could break callers |
+| **`minor`** | New feature, new option, new export, widened peer-dep range — backwards-compatible |
+| **`major`** | Removed/renamed export, changed function signature, raised peer-dep or Node minimum, changed runtime behavior in a way that could break callers |
 
-When the PR merges to `main`, the Release workflow opens (or updates) a "Version Packages" PR aggregating all pending changesets. Merging that PR publishes to npm + creates the GitHub Release.
+The version bump can also ride along in the last feature PR of a release.
 
-You never type a version number by hand. Changesets computes it from the bump types of merged changesets.
+### 2. Publish a GitHub Release
 
-### No — skip the changeset
+1. On GitHub, go to **Releases → Draft a new release**
+2. **Choose a tag** → type `v<version>` (e.g. `v2.1.0`, must match `package/package.json`) → **Create new tag on publish**, target `main`
+3. Click **Generate release notes**, then edit them — call out breaking changes and link `MIGRATION.md` for majors
+4. Click **Publish release**
 
-If your change has **zero impact on the published package**, no changeset is needed. Common cases:
-
-- Documentation-only edits (README, root markdown)
-- CI / GitHub Actions tweaks (`.github/workflows/`)
-- Test-only changes (no production code touched)
-- `examples/` updates (not part of the published package — `files` in `package.json` only ships `dist/` + README + MIGRATION + LICENSE)
-- Repo tooling (`.gitignore`, `.editorconfig`, etc.)
-- Internal refactors with byte-identical compiled output
-- Comment / typo fixes inside source files
-
-For an explicit "no version bump needed" marker:
-
-```bash
-npm run changeset -- --empty
-```
+The [Release workflow](#workflows) then checks the tag against `package.json`, runs typecheck/tests/build, and publishes to npm with provenance. Watch it under the **Actions** tab.
 
 ### Pre-releases (beta, rc, etc.)
 
 ```bash
 cd package
-npx changeset pre enter beta   # subsequent merges produce 2.1.0-beta.0, 2.1.0-beta.1, ...
-# ... ship some betas ...
-npx changeset pre exit         # back to stable; next release rolls up to 2.1.0
+npm version 2.1.0-beta.0 --no-git-tag-version   # later betas: npm version prerelease --no-git-tag-version
 ```
 
-### Avoiding accidental releases
+Merge, then publish the GitHub Release as `v2.1.0-beta.0` with **Set as a pre-release** ticked. Pre-releases publish under the `next` dist-tag, so `npm install watsonx-ai-provider` keeps resolving to the latest stable; testers use `npm install watsonx-ai-provider@next`.
 
-The Release workflow only fires when `.changeset/*.md` files (other than `README.md`) exist on `main`. To save in-progress changeset content without triggering it, use a non-`.md` extension like `<name>.md.draft` — Changesets ignores anything that doesn't end in `.md`.
+### Release notes / changelog
+
+Release notes live on [GitHub Releases](https://github.com/IBM/watsonx-ai-provider/releases). [`package/CHANGELOG.md`](./package/CHANGELOG.md) covers versions up to 2.0.0 and is no longer updated.
 
 ## Release pipeline
 
-`watsonx-ai-provider` uses [Changesets](https://github.com/changesets/changesets) for versioning and `npm publish` via GitHub Actions with [Trusted Publishing](https://docs.npmjs.com/trusted-publishers) (OIDC, no long-lived tokens).
+`watsonx-ai-provider` publishes via GitHub Actions with [npm Trusted Publishing](https://docs.npmjs.com/trusted-publishers) (OIDC, no long-lived tokens).
 
 ### Workflows
 
 **`.github/workflows/ci.yml`** runs on every PR/push to `main` (paths-filtered to `package/**`). Type-checks, runs unit tests, and builds. Tested against Node 20 and 22.
 
-**`.github/workflows/release.yml`** runs on every push to `main`. It implements the Changesets release flow inline using shell + `gh` (the upstream `changesets/action@v1` is not on IBM's allowed-actions list):
+**`.github/workflows/release.yml`** runs when a GitHub Release is published. It checks out the tagged commit, fails if the tag isn't `v<package.json version>`, runs typecheck/tests/build, and runs `npm publish --provenance` (with `--tag next` for pre-releases). It runs on Node 24, whose bundled npm (≥ 11.5.1) supports Trusted Publishing.
 
-- If `.changeset/*.md` files exist → runs `npx changeset version`, commits the bump on `changeset-release/main`, and opens/updates the "Version Packages" PR via `gh pr create`
-- If no pending changesets and `package.json` version is ahead of what's on npm (i.e., the Version Packages PR was merged) → publishes to npm with provenance, creates the git tag, creates the GitHub Release with the matching CHANGELOG section as the body
-
-The workflow only uses IBM-allowed actions (`actions/checkout`, `actions/setup-node`); everything else is shell. If you're tempted to "simplify" this back to `changesets/action@v1`, don't — it'll be blocked by IBM org policy at workflow-run time.
+Workflows may only use IBM-allowed actions (`actions/checkout`, `actions/setup-node`); third-party actions such as `changesets/action` are blocked by IBM org policy at workflow-run time. Keep anything else as shell.
 
 ## One-time setup (kept for reference)
 
@@ -87,12 +79,11 @@ These steps are already done for the live repo — documented here for anyone se
    - Environment name: leave blank
 3. Save
 
-The Release workflow has `permissions: id-token: write`, which lets it present a GitHub OIDC identity to npm at publish time. npm verifies the identity matches the trusted publisher and authorizes the publish — no long-lived `NPM_TOKEN` secret required.
+The Release workflow has `permissions: id-token: write`, which lets it present a GitHub OIDC identity to npm at publish time. npm verifies the identity matches the trusted publisher and authorizes the publish — no long-lived `NPM_TOKEN` secret required. Renaming `release.yml` breaks this until the Trusted Publisher entry is updated to match.
 
 ### GitHub repository settings
 
-- **Settings → Actions → General → "Allow GitHub Actions to create and approve pull requests"** must be enabled. The Release workflow opens the "Version Packages" PR via the same `GITHUB_TOKEN`.
-- *(Optional)* **Branch protection on `main`** requiring CI to pass before merging the Version Packages PR.
+- *(Optional)* **Branch protection on `main`** requiring CI to pass before merging.
 
 ## Manual publish (emergency only)
 
@@ -107,26 +98,26 @@ npm login    # interactive; uses your account's 2FA
 npm publish
 ```
 
-Then manually create the git tag and GitHub Release. Avoid this path; it bypasses the changelog automation.
+Then create the GitHub Release for the version. That triggers the Release workflow, which will fail at `npm publish` because the version already exists — expected, and harmless.
 
 ## Troubleshooting
 
-### "npm ERR! 403 Forbidden" during release.yml
+### "Release tag 'vX.Y.Z' does not match package.json version"
+
+The version bump wasn't merged before the release was published, or the tag has a typo. Nothing was published. Delete the GitHub Release **and** its tag (Releases → the release → Delete; then Tags → the tag → Delete), merge the bump, and publish the release again.
+
+### The Release workflow failed before publishing (tests, build)
+
+Nothing reached npm. Fix the problem on `main`, delete the GitHub Release and its tag, and publish the release again — re-creating the tag makes it point at the fixed commit. Re-running the failed workflow run is not enough, since it re-runs against the old tagged commit.
+
+If `npm publish` itself succeeded, that version is taken on npm for good; bump to the next patch for any fix.
+
+### "npm ERR! 403 Forbidden" / 404 on PUT during publish
 
 - Verify Trusted Publisher is configured on the npm package with the matching GitHub org / repo / workflow filename
 - Confirm the workflow has `permissions: id-token: write`
 - Check that the package name in `package.json` matches the package on npm (`watsonx-ai-provider`)
-
-### The "Version Packages" PR isn't being created
-
-- Verify Settings → Actions → General has "Allow GitHub Actions to create and approve pull requests" enabled
-- Confirm at least one `.changeset/*.md` file exists on `main` (other than `README.md`)
-- Check the Release workflow run logs for permission errors or `gh` failures
-- The workflow pushes to a branch named `changeset-release/main` — make sure no branch protection rule forbids the bot from pushing to that pattern
-
-### A changeset was merged but the version isn't bumping correctly
-
-- Look at the open "Version Packages" PR — Changesets aggregates *all* pending changesets and uses the highest bump type. A `major` changeset means the next release is a major bump, regardless of how many `patch`/`minor` are also pending.
+- A 404 on the publish PUT usually means npm is older than 11.5.1 — check the npm version printed in the workflow's setup step
 
 ### Tests failing in CI
 

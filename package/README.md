@@ -272,7 +272,7 @@ import {
 
 ## Contributing
 
-See [`CONTRIBUTING.md`](https://github.com/IBM/watsonx-ai-provider/blob/main/CONTRIBUTING.md) at the repo root for the changeset / release flow.
+See [`CONTRIBUTING.md`](https://github.com/IBM/watsonx-ai-provider/blob/main/CONTRIBUTING.md) at the repo root for the PR and release flow.
 
 ## License
 

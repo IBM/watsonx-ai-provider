@@ -16,6 +16,14 @@ You'll need:
 
 ## Run
 
+This example uses the local package in [`../../package`](../../package), so build it first:
+
+```sh
+(cd ../../package && npm ci && npm run build)
+```
+
+Then install and start the example:
+
 ```sh
 npm i
 npm run start

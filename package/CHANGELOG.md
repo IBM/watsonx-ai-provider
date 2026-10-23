@@ -1,5 +1,7 @@
 # watsonx-ai-provider
 
+Release notes for versions after 2.0.0 are published on [GitHub Releases](https://github.com/IBM/watsonx-ai-provider/releases). This file is no longer updated.
+
 ## 2.0.0
 
 ### Major Changes

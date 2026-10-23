@@ -20,7 +20,7 @@ It also allows you to use watsonx.ai models in other applications that integrate
 
 - [**Package README**](./package/README.md) — full usage docs (installation, examples, providerOptions, models, error handling)
 - [**Migration guide**](./package/MIGRATION.md) — v1 → v2 upgrade notes
-- [**Contributing**](./CONTRIBUTING.md) — changeset workflow, release pipeline, and Trusted Publishing setup
+- [**Contributing**](./CONTRIBUTING.md) — PR flow, releasing, and Trusted Publishing setup
 
 ## License
 
