@@ -8,7 +8,7 @@
     "@ai-sdk/react": "^3.0.0",
     "ai": "^6.0.0",
     "dotenv": "^16.5.0",
-    "next": "15.3.0",
+    "next": "15.5.28",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "watsonx-ai-provider": "file:../../package"
