@@ -15,14 +15,18 @@ export function createMockFetch(options: {
     return vi.fn().mockRejectedValue(throwError);
   }
 
-  return vi.fn().mockResolvedValue({
-    ok: status >= 200 && status < 300,
-    status,
-    statusText: status === 200 ? 'OK' : 'Error',
-    json: () => Promise.resolve(response),
-    text: () => Promise.resolve(JSON.stringify(response)),
-    headers: new Headers(headers),
-    url: 'https://us-south.ml.cloud.ibm.com/ml/v1/text/chat',
+  // A real Response, built fresh per call: provider-utils reads `body` as a
+  // stream, and a body can only be read once.
+  return vi.fn().mockImplementation(() => {
+    const res = new Response(JSON.stringify(response), {
+      status,
+      statusText: status === 200 ? 'OK' : 'Error',
+      headers,
+    });
+    Object.defineProperty(res, 'url', {
+      value: 'https://us-south.ml.cloud.ibm.com/ml/v1/text/chat',
+    });
+    return Promise.resolve(res);
   });
 }
 
